@@ -1,0 +1,37 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(client, "Клиент", "Клиент")
+System_Ext(payment_service, "Платежный сервис", "Внешний сервис для проведения оплат")
+System_Ext(partner_systems, "Системы партнеров", "Системы партнеров для оформления страховок")
+System_Ext(insurance_systems, "Системы страховых компаний", "Системы страховых компаний для получения тарифов")
+
+System_Boundary(InsureTech_Prod, "InsureTech Prod (Virtual Machine)") {
+
+    Container(insuretech_web, "InsureTech Web", "JavaScript, React", "Веб-приложение InsureTech")
+    Container(client_info, "client-info", "Kotlin, SpringBoot", "Сервис для учета клиентских данных")
+    Container(core_app, "core-app", "Kotlin, SpringBoot", "Монолитное приложение для отображения и обработки данных по страховкам")
+    ContainerDb(core_db, "core-db", "PostgreSQL", "БД для хранения тарифов и заявок")
+    Container(ins_product_aggregator, "ins-product-aggregator", "Kotlin, SpringBoot", "Сервис для интеграции с API страховых компаний и агрегации данных")
+    ContainerQueue(product_stream, "Kafka Topic", "Event Streaming", "Поток данных по продуктам и тарифам")
+    ContainerQueue(core_subscription, "Core Subscription", "Event Streaming", "Подписка на обновления продуктов и тарифов")
+    Container(ins_comp_settlement, "ins-comp-settlement", "Kotlin, SpringBoot", "Сервис для учета расчетов со страховыми компаниями")
+    ContainerDb(ins_comp_settlement_db, "ins-comp-settlement-db", "PostgreSQL", "БД для учета расчетов со страховыми компаниями")
+    ContainerQueue(settlement_subscription, "Settlement Subscription", "Event Streaming", "Подписка на обновления продуктов и тарифов")
+
+    client --> insuretech_web : "Получение информации о страховках"
+    insuretech_web --> core_app : "Запрос тарифов / страховок [REST]"
+    core_app --> core_subscription : "Подписка на обновления продуктов и тарифов [Event Streaming]"
+    core_app --> core_db : "Чтение/Запись данных о страховках [TCP]"
+    ins_product_aggregator --> insurance_systems : "Запрос продуктов и тарифов [REST/SOAP/GraphQL]"
+    ins_product_aggregator --> product_stream : "Публикация обновлений продуктов и тарифов [Event Streaming]"
+    product_stream --> core_app : "Получение обновлений продуктов и тарифов [Event Streaming]"
+    ins_comp_settlement --> settlement_subscription : "Подписка на обновления продуктов и тарифов [Event Streaming]"
+    ins_comp_settlement --> core_app : "Запрос всех оформленных страховок [REST]"
+    ins_comp_settlement --> ins_comp_settlement_db : "Чтение/Запись расчетов [TCP]"
+    payment_service --> core_app : "Проведение оплат [REST]"
+    partner_systems --> core_app : "Оформление страховок [REST]"
+    product_stream --> ins_comp_settlement : "Получение обновлений продуктов и тарифов [Event Streaming]"
+}
+
+@enduml
